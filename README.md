@@ -4,6 +4,11 @@ A small working version of the Scenario 2 idea: every load gets one internal ID,
 appends an event to that load's timeline, and one view shows where each load is and which
 stage failed first.
 
+![Load trace view: the load table with filters and status tabs, and LD-1010 expanded to show its stage sequence and the planner override diagnosis](docs/load-trace-screenshot.webp)
+
+*The load trace view. LD-1010 is expanded: the planner rejected the recommended truck, and the
+diagnosis traces it back to the solver's objective weights.*
+
 ## Build and run
 
 The app has two parts, each run in its own terminal:
