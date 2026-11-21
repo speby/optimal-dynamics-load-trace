@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd backend && uv run uvicorn loadtrace.api:app --reload --port 8000"],
+      "port": 8000
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd frontend && npm run dev -- --port 5173 --strictPort"],
+      "port": 5173
+    }
+  ]
+}
