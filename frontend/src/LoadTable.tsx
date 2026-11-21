@@ -3,6 +3,7 @@ import type { LoadTrace } from "./types";
 import { ID_LABELS, STATE_LABELS, fmtAgo, fmtTime, stageLabel } from "./format";
 import { Stepper } from "./Stepper";
 import { Timeline } from "./Timeline";
+import { DecisionPanel } from "./Decision";
 
 export type SortKey = "state" | "load_id" | "customer" | "source" | "current_stage" | "last_update";
 export interface Sort { key: SortKey; dir: "asc" | "desc" }
@@ -106,6 +107,14 @@ function LoadDetail({ load }: { load: LoadTrace }) {
       )}
 
       <Stepper stages={load.stages} />
+
+      {load.warnings.map((w) => (
+        <div key={w.stage} className="callout soft-warn">
+          <strong>Input warning at {stageLabel(w.stage)}</strong> <span>{w.warning}</span>
+        </div>
+      ))}
+
+      {load.decision && <DecisionPanel decision={load.decision} override={load.override} />}
 
       <div className="detail-grid">
         <dl className="ids">

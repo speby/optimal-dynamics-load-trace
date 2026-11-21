@@ -46,6 +46,7 @@ def test_seeded_states(store):
     states = {l: build_trace(store, l)["state"] for l in store.find()}
     assert sorted(l for l, s in states.items() if s == "failed") == ["LD-1004", "LD-1005"]
     assert sorted(l for l, s in states.items() if s == "in_progress") == ["LD-1006", "LD-1008", "LD-1011"]
+    assert sorted(l for l, s in states.items() if s == "overridden") == ["LD-1003", "LD-1010", "LD-1013", "LD-1014"]
 
 
 def test_recent_ack_is_waiting_not_failed(store):

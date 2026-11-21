@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchLoads, type LoadState, type LoadTrace, type LoadsResponse } from "./types";
-import { STATE_LABELS, stageLabel } from "./format";
+import { DIAGNOSIS_LABELS, STATE_LABELS, stageLabel } from "./format";
 import { LoadTable, type Sort, type SortKey } from "./LoadTable";
 
-const STATE_ORDER: LoadState[] = ["failed", "in_progress", "complete"];
+const STATE_ORDER: LoadState[] = ["failed", "overridden", "in_progress", "complete"];
 const ALL = "";
 
 interface Filters {
@@ -11,10 +11,11 @@ interface Filters {
   customer: string;
   source: string;
   stage: string;
+  diagnosis: string;
   state: LoadState | typeof ALL;
 }
 
-const EMPTY: Filters = { q: "", customer: ALL, source: ALL, stage: ALL, state: ALL };
+const EMPTY: Filters = { q: "", customer: ALL, source: ALL, stage: ALL, diagnosis: ALL, state: ALL };
 
 export function App() {
   const [data, setData] = useState<LoadsResponse | null>(null);
@@ -36,13 +37,14 @@ export function App() {
       customers: uniq(loads.map((l) => l.customer)),
       sources: uniq(loads.map((l) => l.source)),
       stages: data?.stages ?? [],
+      diagnoses: Object.keys(DIAGNOSIS_LABELS),
     };
   }, [data]);
 
   // Everything except the status filter, so the status tabs can show counts.
   const matching = useMemo(
     () => (data?.loads ?? []).filter((l) => matches(l, filters)),
-    [data, filters.q, filters.customer, filters.source, filters.stage],
+    [data, filters.q, filters.customer, filters.source, filters.stage, filters.diagnosis],
   );
 
   const rows = useMemo(() => {
@@ -81,7 +83,7 @@ export function App() {
       return next;
     });
 
-  const filtered = filters.q || filters.customer || filters.source || filters.stage || filters.state;
+  const filtered = filters.q || filters.customer || filters.source || filters.stage || filters.diagnosis || filters.state;
 
   return (
     <>
@@ -109,6 +111,7 @@ export function App() {
         <Select label="Customer" value={filters.customer} options={options.customers} onChange={(customer) => set({ customer })} />
         <Select label="Source" value={filters.source} options={options.sources} onChange={(source) => set({ source })} />
         <Select label="Current stage" value={filters.stage} options={options.stages} format={stageLabel} onChange={(stage) => set({ stage })} />
+        <Select label="Override diagnosis" value={filters.diagnosis} options={options.diagnoses} format={(d) => DIAGNOSIS_LABELS[d] ?? d} onChange={(diagnosis) => set({ diagnosis })} />
         {filtered && <button className="link" onClick={() => setFilters(EMPTY)}>Clear filters</button>}
       </section>
 
@@ -143,6 +146,7 @@ function matches(l: LoadTrace, f: Filters): boolean {
   if (f.customer && l.customer !== f.customer) return false;
   if (f.source && l.source !== f.source) return false;
   if (f.stage && l.current_stage !== f.stage) return false;
+  if (f.diagnosis && l.override?.diagnosis.code !== f.diagnosis) return false;
   const q = f.q.trim().toLowerCase();
   if (q) {
     const ids = [l.load_id, ...Object.values(l.external_ids)].map((x) => x.toLowerCase());

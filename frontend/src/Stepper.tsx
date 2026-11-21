@@ -7,11 +7,11 @@ export function Stepper({ stages, compact = false }: { stages: StageEntry[]; com
     <ol className={`stepper ${compact ? "compact" : "full"}`} style={{ gridTemplateColumns: `repeat(${stages.length}, 1fr)` }}>
       {stages.map((s, i) => {
         const prevDone = i > 0 && stages[i - 1].status === "done";
-        const tip = [stageLabel(s.stage), s.status.replace("_", " "), fmtTime(s.time), s.reason]
+        const tip = [stageLabel(s.stage), s.status.replace("_", " "), fmtTime(s.time), s.reason, sublabel(s), s.detail.warning as string | undefined]
           .filter(Boolean)
           .join(" · ");
         return (
-          <li key={s.stage} className={`step ${s.status} ${i === 0 ? "first" : ""} ${prevDone ? "from-done" : ""}`} title={tip}>
+          <li key={s.stage} className={`step ${s.status} ${i === 0 ? "first" : ""} ${prevDone ? "from-done" : ""} ${attention(s) ? "attention" : ""}`} title={tip}>
             <span className="dot" aria-hidden>
               {s.status === "done" && <Check />}
               {s.status === "failed" && <Cross />}
@@ -31,8 +31,12 @@ export function Stepper({ stages, compact = false }: { stages: StageEntry[]; com
   );
 }
 
+// A stage that passed but deserves a look: a planner rejection, or a soft input warning.
+const attention = (s: StageEntry) => s.detail.action === "rejected" || !!s.detail.warning;
+
 function sublabel(s: StageEntry): string | null {
-  if (s.stage === "planner_decision" && s.detail.action) return s.detail.action === "changed" ? "Changed" : "Accepted";
+  if (s.stage === "planner_decision" && s.detail.action) return s.detail.action === "rejected" ? "Rejected" : "Accepted";
+  if (s.detail.warning) return "Warning";
   return null;
 }
 

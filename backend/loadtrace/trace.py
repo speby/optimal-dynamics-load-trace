@@ -4,7 +4,24 @@ from datetime import datetime
 from typing import Any
 
 from . import config
+from .diagnose import diagnose
 from .store import Event, Store
+
+TOP_CANDIDATES = 5
+
+
+def _decision(store: Store, load_id: str, solve_id: str | None) -> dict[str, Any] | None:
+    """The solver's decision record, fetched through the pointer on the solve_run event."""
+    if not solve_id:
+        return None
+    return store.decision_record(solve_id, load_id)
+
+
+def decision_view(record: dict[str, Any], pick: str | None) -> dict[str, Any]:
+    """Trim a decision record for the page: top candidates plus the planner's truck."""
+    top = [c for c in record["candidates"] if c["feasible"]][:TOP_CANDIDATES]
+    extra = [c for c in record["candidates"] if c["truck"] == pick and c not in top]
+    return {k: v for k, v in record.items() if k != "candidates"} | {"candidates": top + extra}
 
 
 def build_trace(store: Store, load_id: str, now: datetime | None = None) -> dict[str, Any]:
@@ -50,21 +67,42 @@ def build_trace(store: Store, load_id: str, now: datetime | None = None) -> dict
         prev = e if entry["status"] == "done" else None
         stages.append(entry)
 
+    # Load facts come from the events themselves, not a separate table.
+    def fact(stage: str, key: str) -> Any:
+        return latest[stage].detail.get(key) if stage in latest else None
+
+    rejected = fact("planner_decision", "action") == "rejected"
     if first_failure:
         state = "failed"
     elif all(s["status"] == "done" for s in stages):
-        state = "complete"
+        # The pipeline worked; if the planner rejected the answer, that's its own outcome.
+        state = "overridden" if rejected else "complete"
     else:
         state = "in_progress"
+
+    # Soft warnings: stages that passed but were close to a limit.
+    warnings = [{"stage": s["stage"], "warning": s["detail"]["warning"]}
+                for s in stages if s["status"] == "done" and s["detail"].get("warning")]
+
+    decision = _decision(store, load_id, fact("solve_run", "solve_id"))
+    override = None
+    if rejected and decision:
+        pick = fact("planner_decision", "assigned_truck")
+        code = fact("planner_decision", "reason_code")
+        override = {
+            "recommended_truck": fact("planner_decision", "recommended_truck"),
+            "assigned_truck": pick,
+            "driver": fact("planner_decision", "driver"),
+            "reason_code": code,
+            "reason": config.PLANNER_REASON_CODES.get(code, code),
+            "note": fact("planner_decision", "note"),
+            "diagnosis": diagnose(decision, pick, code),
+        }
 
     # Where the load is now: the failed or waiting stage, else the last one done.
     current = next((s["stage"] for s in stages if s["status"] in ("failed", "waiting")), None)
     if current is None:
         current = next((s["stage"] for s in reversed(stages) if s["status"] == "done"), config.STAGES[0])
-
-    # Load facts come from the events themselves, not a separate table.
-    def fact(stage: str, key: str) -> Any:
-        return latest[stage].detail.get(key) if stage in latest else None
 
     return {
         "load_id": load_id,
@@ -75,9 +113,12 @@ def build_trace(store: Store, load_id: str, now: datetime | None = None) -> dict
         "source_ref": fact("received", "ref"),
         "origin": fact("normalized", "origin"),
         "destination": fact("normalized", "destination"),
-        "truck": fact("recommended", "truck") or fact("checked", "truck"),
+        "truck": fact("planner_decision", "assigned_truck") or fact("recommended", "truck") or fact("checked", "truck"),
         "planner_action": fact("planner_decision", "action"),
         "state": state,
+        "override": override,
+        "decision": decision_view(decision, override["assigned_truck"] if override else None) if decision else None,
+        "warnings": warnings,
         "current_stage": current,
         "first_failure": first_failure,
         "last_update": events[-1].event_time.isoformat() if events else None,

@@ -29,6 +29,7 @@ Tool: Claude Code (Claude Opus 5.5), driven from the Claude desktop app.
 | 3 | **Unrealistic ID model.** Every load had a TMS load #, an EDI control # *and* an ELD unit, as if each load came in from three systems at once. It also treated the ELD unit (the *truck's* ID) as a load ID. The ID table's primary key let each external ID map to only one load, so a truck could never appear on a second load. | **Sean**, looking at the first UI: "Some loads would be sourced from a single TMS, or a single EDI feed, right?" | Each load now comes from exactly one source: a TMS load # **or** an EDI 204 shipment ID + control #. The ELD unit is linked when a truck is checked/assigned. The ID table now allows one ID → many loads (like a DynamoDB GSI). New tests: one source per load; a truck search returns every load it hauled. | Sean caught it; AI implemented |
 | 4 | Made-up EDI control numbers came from a formula that gave two loads from the same shipper the same number. | AI, re-reading its own seed code before running it | Switched to a CRC32 of the shipment ID | AI, on review |
 | 5 | **Thread-safety bug.** The AI opened one SQLite connection with `check_same_thread=False` and shared it across FastAPI's worker threads with no lock. Two requests at the same moment (React dev mode fetches twice) got each other's rows and crashed with 500s. It only happened sometimes, so all the single-request tests passed. | **Sean** saw "API 500" in the page | Server logs showed two different crashes from the same line, which pointed to interleaving. Wrote a test with 200 parallel requests that failed first, then routed every query through a lock. The page's error text also blamed a stopped backend for any error, so it now says when the API returned an error instead. | Sean caught it; AI diagnosed and fixed |
+| 6 | The first draft of the Decision panel imported a helper module (`./drivers`) that didn't exist. | AI, re-reading the component before typechecking | Used the driver name already on the override instead | AI, on review |
 
 ## Known gaps left on purpose
 
@@ -69,3 +70,16 @@ Tool: Claude Code (Claude Opus 5.5), driven from the Claude desktop app.
    - A failure reason gets its own highlighted line.
    - Raw, pretty-printed JSON opens per event (`{ }` button) or for the whole timeline at once
      ("Show raw JSON").
+5. **Planner overrides and the solver trace.** Sean pointed out the gap: a load where the planner
+   rejects the recommendation still showed as *Complete*, with no way to see why the solver chose
+   what it did or why the planner disagreed. The design was discussed before building:
+   - Overrides get their own **Overridden** status.
+   - The solver writes a decision record: versions, funnel, scored candidates, input warnings.
+   - The planner gives a one-click reason and their own truck.
+   - A diagnosis comes from where the planner's truck sat in the solver's view: data gap,
+     ruled out by a constraint (or its stale input), scored lower (weights), or missing context.
+
+   The AI built a small real solver (constraints plus weighted scoring), so the diagnoses are
+   *derived* from the decision record, not hard-coded per load. It added a test proving that a
+   weights change in `config.py` makes the solver agree with LD-1010's planner: a ready-made live
+   change for the interview.

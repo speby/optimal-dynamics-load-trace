@@ -31,6 +31,16 @@ CREATE TABLE external_ids (
     PRIMARY KEY (system, external_id, load_id)
 );
 CREATE INDEX external_ids_by_load ON external_ids (load_id);
+
+-- Stands in for S3: the solver's full decision record, one per (solve, load).
+-- The timeline's solve_run event only carries a summary and a pointer to this.
+CREATE TABLE decision_records (
+    solve_id TEXT NOT NULL,
+    load_id  TEXT NOT NULL,
+    record   TEXT NOT NULL,
+    PRIMARY KEY (solve_id, load_id)
+);
+CREATE INDEX decision_records_by_load ON decision_records (load_id);
 """
 
 
@@ -79,6 +89,18 @@ class Store:
             "SELECT system, external_id FROM external_ids WHERE load_id = ?", (load_id,)
         )
         return dict(rows)
+
+    def put_decision_record(self, solve_id: str, load_id: str, record: dict[str, Any]) -> None:
+        self._query(
+            "INSERT INTO decision_records (solve_id, load_id, record) VALUES (?, ?, ?)",
+            (solve_id, load_id, json.dumps(record)),
+        )
+
+    def decision_record(self, solve_id: str, load_id: str) -> dict[str, Any] | None:
+        rows = self._query(
+            "SELECT record FROM decision_records WHERE solve_id = ? AND load_id = ?", (solve_id, load_id)
+        )
+        return json.loads(rows[0][0]) if rows else None
 
     def find(self, query: str = "") -> list[str]:
         """Internal load IDs matching the query against the internal ID or any external ID."""

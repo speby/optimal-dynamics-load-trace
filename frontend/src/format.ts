@@ -14,6 +14,7 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export const STATE_LABELS: Record<LoadState, string> = {
   failed: "Failed",
+  overridden: "Overridden",
   in_progress: "In progress",
   complete: "Complete",
 };
@@ -37,3 +38,19 @@ export function fmtAgo(iso: string | null, nowIso: string): string {
   if (min < 60) return `${min}m ago`;
   return `${Math.floor(min / 60)}h ${min % 60}m ago`;
 }
+
+export const COMPONENT_LABELS: Record<string, string> = {
+  deadhead: "Deadhead",
+  on_time: "On-time",
+  cost: "Cost",
+  network_balance: "Network balance",
+};
+
+export const DIAGNOSIS_LABELS: Record<string, string> = {
+  not_considered: "Data gap: never a candidate",
+  ruled_out: "Ruled out by a constraint",
+  scored_lower: "Scored lower (weights)",
+  planner_context: "Missing context",
+};
+
+export const truckLabel = (t: string | null | undefined) => (t ? t.replace("ELD-", "") : "—");
