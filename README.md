@@ -4,17 +4,80 @@ A small working version of the Scenario 2 idea: every load gets one internal ID,
 appends an event to that load's timeline, and one view shows where each load is and which
 stage failed first.
 
-## Run it
+## Build and run
+
+The app has two parts, each run in its own terminal:
+
+- **API:** Python + FastAPI on port 8000
+- **Web page:** TypeScript + React, served by Vite on port 5173. It forwards `/api` calls to the API.
+
+### 1. Install the prerequisites (once)
+
+| Tool | Version | Install |
+|------|---------|---------|
+| [uv](https://docs.astral.sh/uv/) | any recent | `curl -LsSf https://astral.sh/uv/install.sh \| sh` (installs Python 3.12 for you on first run) |
+| [Node.js](https://nodejs.org/) | 18 or newer | from nodejs.org, or `brew install node` |
+| Git | any | to clone the repo |
+
+### 2. Get the code
 
 ```bash
-cd backend && uv sync && uv run uvicorn loadtrace.api:app --reload --port 8000
+git clone https://github.com/speby/optimal-dynamics-load-trace.git
+cd optimal-dynamics-load-trace
 ```
+
+### 3. Start the API (terminal 1)
 
 ```bash
-cd frontend && npm install && npm run dev
+cd backend
+uv sync
+uv run uvicorn loadtrace.api:app --reload --port 8000
 ```
 
-Open http://localhost:5173. Tests: `cd backend && uv run pytest -q`.
+Wait for `Application startup complete`. To check it's up, open
+http://localhost:8000/api/loads; you should see JSON for 12 loads.
+
+### 4. Start the web page (terminal 2)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 5. Open it
+
+Go to **http://localhost:5173**. You should see 12 loads: 2 failed, 3 in progress, 7 complete.
+Click any row to expand it.
+
+To stop, press `Ctrl+C` in each terminal. The data is made up and rebuilt each time the API
+starts, so there's nothing to reset.
+
+### Run the tests
+
+```bash
+cd backend
+uv run pytest -q
+```
+
+### Build for production (optional)
+
+```bash
+cd frontend
+npm run build
+```
+
+This typechecks the code and writes a static site to `frontend/dist/`. It still needs the API
+running behind `/api`.
+
+### If something goes wrong
+
+| What you see | What to do |
+|--------------|------------|
+| "Couldn't load traces… Is the backend running on :8000?" | The API isn't running. Start it (step 3). |
+| "Couldn't load traces: API 500…" | The API is running but hit an error. Check the traceback in terminal 1. |
+| `Address already in use` | Something else is on port 8000 or 5173. Stop it, or find it with `lsof -i :8000`. |
+| `uv: command not found` | Install uv (step 1), then open a new terminal. |
 
 ## How it maps to the Scenario 2 design
 
